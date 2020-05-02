@@ -584,6 +584,10 @@ double ClassEngine::get_f(double z)
   return f_z;
 }
 
+double ClassEngine::get_A_s( void )
+{
+  return pm.A_s;
+}
 
 double ClassEngine::get_sigma8(double z)
 {

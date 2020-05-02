@@ -128,6 +128,8 @@ public:
   double get_Hz(double z);
   double get_Az(double z);
 
+  double get_A_s( void );
+
   double getTauReio() const {return th.tau_reio;}
 
   //may need that
