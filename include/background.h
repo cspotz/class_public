@@ -10,10 +10,6 @@
 #include "dei_rkck.h"
 #include "parser.h"
 
-//The name for this macro can be at most 30 characters total
-#define _class_print_species_(name,type) \
-printf("-> %-30s Omega = %-15g , omega = %-15g\n",name,pba->Omega0_##type,pba->Omega0_##type*pba->h*pba->h);
-
 /** list of possible types of spatial curvature */
 
 enum spatial_curvature {flat,open,closed};
@@ -70,7 +66,7 @@ struct background
   double cs2_fld; /**< \f$ c^2_{s~DE} \f$: sound speed of the fluid
 		     in the frame comoving with the fluid (so, this is
 		     not [delta p/delta rho] in the synchronous or
-		     newtonian gauge!) */
+		     newtonian gauge!!!) */
 
   short use_ppf; /**< flag switching on PPF perturbation equations
                     instead of true fluid equations for
@@ -81,11 +77,6 @@ struct background
   double c_gamma_over_c_fld; /**< ppf parameter defined in eq. (16) of 0808.3125 [astro-ph] */
 
   double Omega0_ur; /**< \f$ \Omega_{0 \nu r} \f$: ultra-relativistic neutrinos */
-
-  double Omega0_idr; /**< \f$ \Omega_{0 idr} \f$: interacting dark radiation */
-  double T_idr;      /**< \f$ T_{idr} \f$: current temperature of interacting dark radiation in Kelvins */
-
-  double Omega0_idm_dr; /**< \f$ \Omega_{0 idm_dr} \f$: dark matter interacting with dark radiation */
 
   double Omega0_dcdmdr; /**< \f$ \Omega_{0 dcdm}+\Omega_{0 dr} \f$: decaying cold dark matter (dcdm) decaying to dark radiation (dr) */
 
@@ -139,6 +130,40 @@ struct background
   char * ncdm_psd_files;                /**< list of filenames for tabulated p-s-d */
   /* end of parameters for tabulated ncdm p-s-d */
 
+  /** ---------------------INTERACTIONS BLOCK------------------*/
+
+  int N_si_ncdm;  //Number of ncdm species
+  int * ncdm_si_type;  //Vector of types of ncdm interactions: 0=no interaction, 1=interaction given by tau_rel(T_gamma) table
+
+  char * ncdm_si_tau_files;  //Container for si_ncdm file names
+
+  int index_bg_taurel_si_ncdm1;  /** relaxation time of first ncdm species */
+
+  short has_si_ncdm;                  /** presence of si_ncdm */
+  int * is_early_coupled;             /** whether or not species n' self-interaction is coupled at earliest computed time */
+  int sum_early_coupled;              /** Sum of the above quantity */
+
+  int * is_NR_SI_decoupled;           /** whether or not species n' self-interaction is coupled at T_cmb = m */
+  int sum_NR_SI_decoupled;            /** Sum of the above quantity */
+  int ncdm_NR_SI_decoupling_method;   /** Method used in case of encountering a non relativistic decoupling of Self Interactions*/
+  double ** ncdm_NR_SI_DF_factor;     /** Pre-computed DF correction factors for NR distribution */
+  double ** ncdm_NR_SI_DF_factor_bg;  /** Pre-computed DF correction factors for NR distribution  (for background calculations) */
+  double ** dlnf0_dlnq_ncdm_NR_SI;    /** Pre-computed dlnf0/dlnq for the NR distribution (for perturbation calculations) */
+
+  int * mass_set_by_DF;               /** is the mass parameter auto-set in ncdm calculation*/
+  int * Omega_set_by_DF;              /** is the omega parameter auto-set in ncdm calculation*/
+
+  double ** si_ncdm_table_T;          /** interpolation table: temperature */
+  double ** si_ncdm_table_taurel;     /** interpolation table: relaxation time */
+  double ** si_ncdm_table_d2taurel;   /** interpolation table: second derivative of relaxation time*/
+
+  double * si_ncdm_table_size;        /** size of interpolation table*/
+
+  int background_si_verbose;           /** Flag regulating how talkative is the ncdm SI module */
+
+
+  /** ---------------------INTERACTIONS BLOCK------------------*/
+
   //@}
 
   /** @name - related parameters */
@@ -154,9 +179,6 @@ struct background
   double Neff; /**< so-called "effective neutrino number", computed at earliest time in interpolation table */
   double Omega0_dcdm; /**< \f$ \Omega_{0 dcdm} \f$: decaying cold dark matter */
   double Omega0_dr; /**< \f$ \Omega_{0 dr} \f$: decay radiation */
-  double Omega0_m;  /**< total non-relativistic matter today */
-  double Omega0_r;  /**< total ultra-relativistic radiation today */
-  double Omega0_de; /**< total dark energy density today, currently defined as 1 - Omega0_m - Omega0_r - Omega0_k */
   double a_eq;      /**< scale factor at radiation/matter equality */
   double H_eq;      /**< Hubble rate at radiation/matter equality [Mpc^-1] */
   double z_eq;      /**< redshift at radiation/matter equality */
@@ -189,8 +211,6 @@ struct background
   int index_bg_rho_fld;       /**< fluid density */
   int index_bg_w_fld;         /**< fluid equation of state */
   int index_bg_rho_ur;        /**< relativistic neutrinos/relics density */
-  int index_bg_rho_idm_dr;    /**< density of dark matter interacting with dark radiation */
-  int index_bg_rho_idr;       /**< density of interacting dark radiation */
   int index_bg_rho_dcdm;      /**< dcdm density */
   int index_bg_rho_dr;        /**< dr density */
 
@@ -201,15 +221,10 @@ struct background
   int index_bg_ddV_scf;       /**< scalar field potential second derivative V'' */
   int index_bg_rho_scf;       /**< scalar field energy density */
   int index_bg_p_scf;         /**< scalar field pressure */
-  int index_bg_p_prime_scf;         /**< scalar field pressure */
 
   int index_bg_rho_ncdm1;     /**< density of first ncdm species (others contiguous) */
   int index_bg_p_ncdm1;       /**< pressure of first ncdm species (others contiguous) */
   int index_bg_pseudo_p_ncdm1;/**< another statistical momentum useful in ncdma approximation */
-
-  int index_bg_rho_tot;       /**< Total density */
-  int index_bg_p_tot;         /**< Total pressure */
-  int index_bg_p_tot_prime;   /**< Conf. time derivative of total pressure */
 
   int index_bg_Omega_r;       /**< relativistic density fraction (\f$ \Omega_{\gamma} + \Omega_{\nu r} \f$) */
 
@@ -302,8 +317,6 @@ struct background
   short has_lambda;    /**< presence of cosmological constant? */
   short has_fld;       /**< presence of fluid with constant w and cs2? */
   short has_ur;        /**< presence of ultra-relativistic neutrinos/relics? */
-  short has_idr;       /**< presence of interacting dark radiation? */
-  short has_idm_dr;    /**< presence of dark matter interacting with dark radiation? */
   short has_curvature; /**< presence of global spatial curvature? */
 
   //@}
@@ -466,6 +479,12 @@ extern "C" {
 				     double * test
 				     );
 
+  int background_ncdm_NR_test_function(
+             void *pba,
+             double q,
+             double * test
+             );
+
   int background_ncdm_init(
 			    struct precision *ppr,
 			    struct background *pba
@@ -473,6 +492,8 @@ extern "C" {
 
 
   int background_ncdm_momenta(
+                             struct background *pba,
+                             int n_ncdm,
                              double * qvec,
                              double * wvec,
                              int qsize,
@@ -491,6 +512,66 @@ extern "C" {
 				    struct background *pba,
 					int species
 				    );
+
+  /** SI */
+
+  int background_si_ncdm_init(
+                         struct precision *ppr,
+                         struct background *pba
+                         );
+
+  int background_si_ncdm_reltime(
+                            struct background *pba,
+                            double * reltime,
+                            double z,
+                            int n_ncdm);
+
+  int background_si_ncdm_equivalent_params(
+                                      struct precision *ppr,
+                                      struct background *pba,
+                                      double * equivalent_T,
+                                      double * equivalent_factor,
+                                      double z,
+                                      int n_ncdm);
+
+  int background_get_NR_SI_factor_prime(
+                                      struct background *pba,
+                                      int n_ncdm,
+                                      int index_q,
+                                      double z,
+                                      double *factor_prime
+                                      );
+
+  int background_get_NR_SI_factor_prime_bg(
+                                      struct background *pba,
+                                      int n_ncdm,
+                                      int index_q,
+                                      double z,
+                                      double *factor_prime
+                                      );
+
+  int background_get_NR_SI_dlnf0_dlnq(
+                                    struct background *pba,
+                                    int n_ncdm,
+                                    int index_q,
+                                    double z,
+                                    double * dlnf0_dlnq
+                                    );
+
+  int background_ncdm_NR_SI_DF_store_factors(
+                                           struct background *pba
+                                           );
+
+  #define _NCDM_LARGE_T_OVER_M_ 100.
+  #define _NCDM_SMALL_T_OVER_M_ 1.0e-2
+
+  #define background_ncdm_NR_SI_switching(T_over_m, routine, low_T_value, high_T_value, output_pointer){              \
+  if (T_over_m > _NCDM_LARGE_T_OVER_M_) *output_pointer = high_T_value;                                               \
+  if (T_over_m < _NCDM_SMALL_T_OVER_M_) *output_pointer = low_T_value;                                                \
+  else routine;                                                                                     \
+}
+
+  /** SI */
 
   int background_solve(
 		       struct precision *ppr,
@@ -549,11 +630,6 @@ extern "C" {
                double phi_prime
                );
 
-  /** Budget equation output */
-  int background_output_budget(
-               struct background* pba
-               );
-
 #ifdef __cplusplus
 }
 #endif
@@ -584,15 +660,19 @@ extern "C" {
 //@}
 
 /**
- * @name Some limits on possible background parameters
+ * @name Some numbers useful in numerical algorithms - but not
+ * affecting precision, otherwise would be in precision structure
  */
 
 //@{
 
-#define _h_BIG_ 1.5            /**< maximal \f$ h \f$ */
-#define _h_SMALL_ 0.3         /**< minimal \f$ h \f$ */
-#define _omegab_BIG_ 0.039    /**< maximal \f$ omega_b \f$ */
-#define _omegab_SMALL_ 0.005  /**< minimal \f$ omega_b \f$ */
+#define _H0_BIG_ 1./2997.9     /**< maximal \f$ H_0 \f$ in \f$ Mpc^{-1} (h=1.0) \f$ */
+#define _H0_SMALL_ 0.3/2997.9  /**< minimal \f$ H_0 \f$ in \f$ Mpc^{-1} (h=0.3) \f$ */
+#define _TCMB_BIG_ 2.8         /**< maximal \f$ T_{cmb} \f$ in K */
+#define _TCMB_SMALL_ 2.7       /**< minimal \f$ T_{cmb}  \f$ in K */
+#define _TOLERANCE_ON_CURVATURE_ 1.e-5 /**< if \f$ | \Omega_k | \f$ smaller than this, considered as flat */
+#define _OMEGAK_BIG_ 0.5     /**< maximal \f$ Omega_k \f$ */
+#define _OMEGAK_SMALL_ -0.5  /**< minimal \f$ Omega_k \f$ */
 
 //@}
 
